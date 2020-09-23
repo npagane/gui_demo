@@ -42,6 +42,8 @@ function update_plot (obj, init = false)
       recalc = true;
     case {h.c2_translateZ}
       recalc = true;
+    case {h.functional_form_list}
+      recalc = true;
     case {h.reset}
       reset = true;
       recalc = true;
@@ -156,7 +158,8 @@ function update_plot (obj, init = false)
     figure 1; hold on;
     s1 = surf(x1, y1, z1, 'FaceColor', 'red');
     s2 = surf(x2, y2, z2, 'FaceColor', 'blue');
-    [ff, fs, ss] = determineOrientation(x1, y1, z1, x2, y2, z2);
+    fform = get (h.functional_form_list, "string"){get (h.functional_form_list, "value")};
+    [ff, fs, ss] = determineOrientation(x1, y1, z1, x2, y2, z2, fform);
     title(sprintf ("face-face: %.2f, face-side: %.2f, side-side: %.2f", ff, fs, ss), ...
           'FontSize', 18)
     axis off;
@@ -168,7 +171,7 @@ function update_plot (obj, init = false)
     zlim([extremeMin extremeMax]);
     h.plot = gcf;
   endif
-
+  
 endfunction
 
 function mat = rotateX(theta)
@@ -186,7 +189,7 @@ function mat = rotateZ(theta)
   mat = [cos(theta) -sin(theta) 0; sin(theta) cos(theta) 0; 0 0 1];
 end
 
-function [ff, fs, ss] = determineOrientation(x1, y1, z1, x2, y2, z2)
+function [ff, fs, ss] = determineOrientation(x1, y1, z1, x2, y2, z2, functionClass)
   # find center of polygons 
   poly1 = [mean(mean(x1,2)) mean(mean(y1,2)) mean(mean(z1,2))];
   poly2 = [mean(mean(x2,2)) mean(mean(y2,2)) mean(mean(z2,2))];
@@ -212,7 +215,13 @@ function [ff, fs, ss] = determineOrientation(x1, y1, z1, x2, y2, z2)
   costheta1 = dot(distS/norm(distS), face1/norm(face1));
   costheta2 = dot(distS/norm(distS), face2/norm(face2));
   # get face-face contribution
-  ff = abs(costheta1)*abs(costheta2);
+  if (strcmp(functionClass, 'absolute'))
+    ff = abs(costheta1)*abs(costheta2);
+  elseif (strcmp(functionClass, 'quartic'))
+    ff = abs(costheta1)^2*abs(costheta2)^2;
+  elseif (strcmp(functionClass, 'quadratic'))
+    ff = abs(costheta1)*abs(costheta2);
+  endif
   # determine other charactestic angls other than theta
   distC = poly1 - poly2;
   cosphi1 = dot(distC/norm(distC), face1/norm(face1));
@@ -222,9 +231,21 @@ function [ff, fs, ss] = determineOrientation(x1, y1, z1, x2, y2, z2)
   if (temp > 1)
     temp = 2 - temp;
   endif
-  fs = (1-abs(cospsi))*temp;
+  if (strcmp(functionClass, 'absolute'))
+    fs = (1-abs(cospsi))*temp;
+  elseif (strcmp(functionClass, 'quartic'))
+    fs = (1-abs(cospsi))^2*temp;
+  elseif (strcmp(functionClass, 'quadratic'))
+    fs = sqrt((1-abs(cospsi))^2)*temp;
+  endif
   # get side-side contribution
-  ss = (1-abs(cosphi1))*(1-abs(cosphi2));
+  if (strcmp(functionClass, 'absolute'))
+    ss = (1-abs(cosphi1))*(1-abs(cosphi2));
+  elseif (strcmp(functionClass, 'quartic'))
+    ss = (1-abs(cosphi1))^2*(1-abs(cosphi2))^2;
+  elseif (strcmp(functionClass, 'quadratic'))
+    ss = sqrt((1-abs(cosphi1))^2*(1-abs(cosphi2))^2);
+  endif
 end
 
 ############ rotations ############
@@ -434,7 +455,22 @@ h.reset = uicontrol ("style", "pushbutton",
                           "units", "normalized",
                           "callback", @update_plot,
                           "string", "reset",
-                          "position", [0.95 0.00 0.05 0.04]);              
+                          "position", [0.93 0.00 0.07 0.04]); 
+             
+## functional form
+h.functional_form_label = uicontrol ("style", "text",
+                                 "units", "normalized",
+                                 "string", "Functional form:",
+                                 "horizontalalignment", "left",
+                                 "position", [0.85 0.90 0.07 0.05]);
+
+h.functional_form_list = uicontrol ("style", "listbox",
+                                "units", "normalized",
+                                "string", {"absolute",
+                                           "quartic",
+                                           "quadratic"},
+                                "callback", @update_plot,
+                                "position", [0.83 0.80 0.15 0.15]);               
 
 
 set (gcf, "color", get(0, "defaultuicontrolbackgroundcolor"))
