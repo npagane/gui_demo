@@ -1,0 +1,3 @@
+GUI demos for different projects to help visualize
+
+demo.m holds code to look at how the rotations/translations of 2 cylinders affects three determined quanities: face-face, face-side, and side-side geoemetric contributions 
